@@ -13,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @ToString
 public class Reservation {
-    private Integer reserveNo;
+    private Long reserveNo;
     private Long shopNo;
     private Integer usrNo;
     private ReservationStatus reserveStatus;
@@ -53,13 +53,14 @@ public class Reservation {
     private String searchPhone;
     private Integer result;
     private Integer firstBookingSeq;
-    private List<Integer> bookingNos;
+    private String cellNumber;
 
     public Reservation withPhoneNumber(String phone) {
         return this.toBuilder()
-                .bookingPhoneNumber(phone)
+                .cellNumber(phone) // 수정된 부분
                 .build();
     }
+
 
     public Reservation withSearchPhone() {
         String pattern = "(\\d{3})[-]?(\\d{3,4})[-]?(\\d{4})";
@@ -71,4 +72,13 @@ public class Reservation {
                 .searchPhone(sp)
                 .build();
     }
+
+    public Reservation approve() {
+        if (this.reserveStatus != ReservationStatus.REQUEST) {
+            throw new IllegalStateException("승인할 수 없는 상태입니다: " + this.reserveStatus);
+        }
+        this.reserveStatus = ReservationStatus.APPROVAL;
+        return this;
+    }
+
 }

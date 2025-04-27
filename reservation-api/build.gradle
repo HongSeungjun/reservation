@@ -1,12 +1,26 @@
-import org.springframework.boot.gradle.plugin.SpringBootPlugin
-
 plugins {
     id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.4'
     id 'java-conventions'
 }
 
 dependencies {
-    implementation platform(SpringBootPlugin.BOM_COORDINATES)
+    // 도메인 모듈 의존성
+    implementation project(':reservation-domain')
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    // Spring Boot 의존성
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+
+    // H2 데이터베이스 (런타임에만 필요)
+    runtimeOnly 'com.h2database:h2'
+
+    // 테스트 의존성
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
