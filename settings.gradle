@@ -1,7 +1,7 @@
 pluginManagement {
     repositories {
-        gradlePluginPortal()  // 플러그인 해상소 설정 
-        mavenCentral()        // 추가 플러그인 해상소 
+        gradlePluginPortal()
+        mavenCentral()
     }
     plugins {
         id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
@@ -10,9 +10,9 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
-        mavenCentral()        // 의존성 해상소 설정 
+        mavenCentral()
     }
 }
 
 rootProject.name = 'reservation-service'
-include 'reservation-api'
+include 'reservation-domain','reservation-api'
