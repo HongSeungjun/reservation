@@ -1,27 +1,22 @@
 plugins {
     id 'org.springframework.boot' version '3.4.4'
-    id 'io.spring.dependency-management' version '1.1.0'
+    id 'io.spring.dependency-management' version '1.1.4'
     id 'java-conventions'
 }
 
 dependencies {
-    // 도메인 모듈 의존
-    implementation project(':reservation-domain')
-
     // Spring Data JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
-    runtimeOnly 'com.h2database:h2'
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    // MapStruct
     implementation 'org.mapstruct:mapstruct:1.6.3'
-
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
-    // lombok
-    compileOnly("org.projectlombok:lombok:1.18.30")
 
-    // Web MVC
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-
-    testImplementation 'com.h2database:h2:2.2.220'
-    testImplementation 'org.hibernate.orm:hibernate-core:6.2.8.Final'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    // 테스트 의존성
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'com.h2database:h2'
 }

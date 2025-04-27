@@ -24,9 +24,12 @@ public interface BookingMapper {
     @Mapping(source = "gameMode", target = "gameMode")
     @Mapping(source = "gameTime", target = "gameTime")
     @Mapping(source = "bookingName", target = "bookingName")
-    @Mapping(source = "bookingPhoneNumber", target = "bookingPhoneNumber")
-    @Mapping(target = "bookingNos", ignore = true)
+    @Mapping(source = "phone", target = "cellNumber")
     @Mapping(target = "machineNos", ignore = true)
+    @Mapping(target = "reserveStatus", ignore = true)
+    @Mapping(target = "result", ignore = true)
+    @Mapping(target = "firstBookingSeq", ignore = true)
+
     Booking toModel(BookingEntity entity);
 
     @Mapping(source = "bookingNo", target = "bookingSeq")
@@ -41,14 +44,18 @@ public interface BookingMapper {
     @Mapping(target = "modDt", ignore = true)
     @Mapping(source = "reserveNo", target = "reserveNo")
     @Mapping(source = "bookingChannel", target = "bookingChannel")
-    @Mapping(source = "searchPhone", target = "search_phone")
-    @Mapping(source = "gameMode", target = "game_mode")
-    @Mapping(source = "gameTime", target = "game_time")
-    @Mapping(source = "bookingName", target = "booking_name")
-    @Mapping(source = "bookingPhoneNumber", target = "booking_phone_number")
+    @Mapping(source = "searchPhone", target = "searchPhone")
+    @Mapping(source = "gameMode", target = "gameMode")
+    @Mapping(source = "gameTime", target = "gameTime")
+    @Mapping(source = "bookingName", target = "bookingName")
+    @Mapping(source = "cellNumber", target = "phone")
     @Mapping(target = "firstBookingDate", ignore = true)
     @Mapping(target = "firstBookingEndDate", ignore = true)
     @Mapping(target = "fixedYn", ignore = true)
     @Mapping(target = "alarmStatus", ignore = true)
+    @Mapping(target = "name", ignore = true)
+    @Mapping(target = "regNm", ignore = true)
+    @Mapping(target = "bookingPhoneNumber", ignore = true)
+
     BookingEntity toEntity(Booking model);
 }

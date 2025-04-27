@@ -16,7 +16,7 @@ public class ReservationEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "reserve_no", nullable = false)
-    private Integer reserveNo;
+    private Long reserveNo;
 
     @Column(name = "shop_no")
     private Integer shopNo;

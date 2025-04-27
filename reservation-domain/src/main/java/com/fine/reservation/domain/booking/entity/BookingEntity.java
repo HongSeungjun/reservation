@@ -15,7 +15,7 @@ public class BookingEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "booking_seq", nullable = false)
-    private Integer bookingSeq;
+    private Long bookingSeq;
 
     @Column(name = "rgn_no")
     private Integer rgnNo;
@@ -54,7 +54,7 @@ public class BookingEntity {
     private LocalDateTime modDt;
 
     @Column(name = "reserve_no")
-    private Integer reserveNo;
+    private Long reserveNo;
 
     @Column(name = "booking_channel")
     private Integer bookingChannel;

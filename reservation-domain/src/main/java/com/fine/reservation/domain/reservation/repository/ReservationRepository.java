@@ -1,12 +1,12 @@
 package com.fine.reservation.domain.reservation.repository;
 
-import com.fine.reservation.domain.reservation.entity.ReservationEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import com.fine.reservation.domain.reservation.model.Reservation;
 
 import java.util.List;
+import java.util.Optional;
 
-@Repository
-public interface ReservationRepository extends JpaRepository<ReservationEntity, Integer> {
-     List<ReservationEntity> findByShopNo(Integer shopNo);
+public interface ReservationRepository {
+     Reservation save(Reservation reservation);
+     Optional<Reservation> findById(Long id);
+     List<Reservation> findAll();
 }
