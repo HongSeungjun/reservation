@@ -1,9 +1,27 @@
 plugins {
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.0'
     id 'java-conventions'
 }
 
-
 dependencies {
-    compileOnly 'jakarta.persistence:jakarta.persistence-api:3.1.0'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
+    // 도메인 모듈 의존
+    implementation project(':reservation-domain')
+
+    // Spring Data JPA
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    runtimeOnly 'com.h2database:h2'
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    // lombok
+    compileOnly("org.projectlombok:lombok:1.18.30")
+
+    // Web MVC
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    testImplementation 'com.h2database:h2:2.2.220'
+    testImplementation 'org.hibernate.orm:hibernate-core:6.2.8.Final'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
 }
