@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @Repository
@@ -19,7 +18,7 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     @Override
     public Reservation save(Reservation reservation) {
         ReservationEntity entity = mapper.toEntity(reservation);
-        ReservationEntity savedEntity = jpaRepository.save(entity);
+        ReservationEntity savedEntity = jpaRepository.saveAndFlush(entity);
         return mapper.toModel(savedEntity);
     }
     
@@ -33,6 +32,6 @@ public class ReservationRepositoryImpl implements ReservationRepository {
     public List<Reservation> findAll() {
         return jpaRepository.findAll().stream()
                 .map(mapper::toModel)
-                .collect(Collectors.toList());
+                .toList();
     }
 }

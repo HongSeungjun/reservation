@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @Repository
@@ -31,7 +30,10 @@ public class BookingRepositoryImpl implements BookingRepository {
 
     @Override
     public List<Booking> findAll() {
-        return List.of();
+        List<BookingEntity> entities = jpaRepository.findAll();
+        return entities.stream()
+                .map(mapper::toModel)
+                .toList();
     }
 
     @Override
@@ -39,7 +41,7 @@ public class BookingRepositoryImpl implements BookingRepository {
         List<BookingEntity> bookingEntities = jpaRepository.findByReserveNo(reserveNo);
         return bookingEntities.stream()
                 .map(mapper::toModel)
-                .collect(Collectors.toList());
+                .toList();
     }
 
 

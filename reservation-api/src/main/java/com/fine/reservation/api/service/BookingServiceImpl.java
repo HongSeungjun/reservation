@@ -5,7 +5,6 @@ import com.fine.reservation.api.service.notification.NotificationService;
 import com.fine.reservation.api.service.notification.PushNotificationService;
 import com.fine.reservation.api.service.notification.RedisCacheService;
 import com.fine.reservation.api.service.notification.WebSocketService;
-import com.fine.reservation.domain.booking.mapper.BookingMapper;
 import com.fine.reservation.domain.booking.model.Booking;
 import com.fine.reservation.domain.booking.repository.BookingRepository;
 import com.fine.reservation.domain.enums.ReservationStatus;
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
