@@ -50,7 +50,7 @@ class BookingServiceImplTest {
     private RedisCacheService cacheService;
 
     @InjectMocks
-    private BookingServiceImpl bookingService;
+    private BookingService bookingService;
 
     @Test
     @DisplayName("예약번호가 있는 경우 Reservation 상태를 업데이트하고 Booking을 생성한다")

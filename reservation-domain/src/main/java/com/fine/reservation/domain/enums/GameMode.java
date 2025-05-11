@@ -29,4 +29,11 @@ public enum GameMode {
     private final String commonCode;
     private final String description;
 
+    public static GameMode fromValue(int value) {
+        return Arrays.stream(values())
+                .filter(mode -> mode.value == value)
+                .findFirst()
+                .orElse(null);
+    }
+
 }

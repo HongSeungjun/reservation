@@ -5,7 +5,6 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @Builder(toBuilder = true)
@@ -77,8 +76,9 @@ public class Reservation {
         if (this.reserveStatus != ReservationStatus.REQUEST) {
             throw new IllegalStateException("승인할 수 없는 상태입니다: " + this.reserveStatus);
         }
-        this.reserveStatus = ReservationStatus.APPROVAL;
-        return this;
+        return this.toBuilder()
+                .reserveStatus(ReservationStatus.APPROVAL)
+                .build();
     }
 
 }
