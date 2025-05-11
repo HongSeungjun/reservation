@@ -2,6 +2,7 @@ package com.fine.reservation.api.controller;
 
 import com.fine.reservation.api.dto.BookingNoResponse;
 import com.fine.reservation.api.dto.BookingRequest;
+import com.fine.reservation.api.dto.TodayBookingResponse;
 import com.fine.reservation.api.service.notification.NotificationService;
 import com.fine.reservation.api.service.notification.PushNotificationService;
 import com.fine.reservation.api.service.notification.RedisCacheService;
@@ -9,6 +10,7 @@ import com.fine.reservation.api.service.notification.WebSocketService;
 import com.fine.reservation.domain.booking.model.Booking;
 import com.fine.reservation.domain.booking.repository.BookingRepository;
 import com.fine.reservation.domain.enums.BookingChannel;
+import com.fine.reservation.domain.enums.GameMode;
 import com.fine.reservation.domain.enums.ReservationStatus;
 import com.fine.reservation.domain.reservation.model.Reservation;
 import com.fine.reservation.domain.reservation.repository.ReservationRepository;
@@ -19,11 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -265,6 +269,52 @@ class BookingControllerIntegrationTest {
         
         verifyNoInteractions(notificationService, pushNotificationService, webSocketService, redisCacheService);
     }
+
+    @Test
+    @DisplayName("특정 날짜(yyyy-MM-dd)로 예약 목록 조회 테스트")
+    void getBookingsBySpecificDateTest() {
+        // Given
+        LocalDate targetDate = LocalDate.now().plusDays(1);
+        String dateString = targetDate.toString();
+
+        LocalDateTime tomorrowStart = targetDate.atStartOfDay();
+
+        Booking booking1 = Booking.builder()
+                .machineNo(401L)
+                .bookingStartAt(tomorrowStart.plusHours(10))
+                .bookingEndAt(tomorrowStart.plusHours(11))
+                .bookingPeople(4)
+                .bookingPlayHole(18)
+                .bookingName("내일예약1")
+                .cellNumber("010-5555-6666")
+                .bookingChannel(BookingChannel.MOBILE)
+                .gameMode(GameMode.STROKE)
+                .gameTime(120)
+                .build();
+
+        bookingRepository.save(booking1);
+
+        System.out.println("저장된 예약: " + booking1);
+
+        // When
+        ResponseEntity<List<TodayBookingResponse>> response = restTemplate.exchange(
+                "/api/bookings/today?startAt=" + dateString,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TodayBookingResponse>>() {}
+        );
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).hasSize(1);
+
+        TodayBookingResponse bookingResponse = response.getBody().get(0);
+        assertThat(bookingResponse.getMachineNo()).isEqualTo(401L);
+        assertThat(bookingResponse.getBookingName()).isEqualTo("내일예약1");
+    }
+
+
 
     private Reservation createAndSaveReservation(ReservationStatus status) {
         Reservation entity = Reservation.builder()

@@ -6,8 +6,10 @@ import com.fine.reservation.domain.booking.model.Booking;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @Repository
@@ -42,6 +44,13 @@ public class BookingRepositoryImpl implements BookingRepository {
         return bookingEntities.stream()
                 .map(mapper::toModel)
                 .toList();
+    }
+
+    @Override
+    public List<Booking> findByBookingStartAtBetween(LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.findByBookingDateBetween(start, end).stream()
+                .map(mapper::toModel)
+                .collect(Collectors.toList());
     }
 
 
