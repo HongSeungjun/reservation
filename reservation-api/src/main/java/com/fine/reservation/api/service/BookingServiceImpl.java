@@ -7,6 +7,7 @@ import com.fine.reservation.api.service.notification.RedisCacheService;
 import com.fine.reservation.api.service.notification.WebSocketService;
 import com.fine.reservation.domain.booking.model.Booking;
 import com.fine.reservation.domain.booking.repository.BookingRepository;
+import com.fine.reservation.domain.enums.GameMode;
 import com.fine.reservation.domain.enums.ReservationStatus;
 import com.fine.reservation.domain.reservation.model.Reservation;
 import com.fine.reservation.domain.reservation.repository.ReservationRepository;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,8 +57,8 @@ public class BookingServiceImpl implements BookingService {
             throw new RuntimeException("유효하지 않은 예약 상태입니다: " + reservation.getReserveStatus());
         }
 
-        reservation.approve();
-        reservationRepository.save(reservation);
+        Reservation approvedReservation = reservation.approve();
+        reservationRepository.save(approvedReservation);
     }
 
     private List<Booking> createMultipleBookings(BookingRequest request) {
@@ -71,12 +73,24 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private Booking createSingleBooking(BookingRequest request, Long machineNo) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
         return Booking.builder()
                 .machineNo(machineNo)
-                .bookingStartAt(LocalDateTime.parse(request.getBookingStartAt()))
-                .bookingEndAt(LocalDateTime.parse(request.getBookingEndAt()))
+                .bookingStartAt(LocalDateTime.parse(request.getBookingStartAt(), formatter))
+                .bookingEndAt(LocalDateTime.parse(request.getBookingEndAt(), formatter))
+                .bookingPeople(request.getBookingPeople())
+                .bookingPlayHole(request.getBookingPlayHole())
+                .bookingName(request.getBookingName())
+                .cellNumber(request.getCellNumber())
+                .bookingChannel(request.getBookingChannel())
+                .gameMode(GameMode.fromValue(request.getGameMode()))
+                .gameTime(request.getGameTime())
+                .bookingMemo(request.getBookingMemo())
                 .reserveNo(request.getReserveNo())
+                .reserveStatus(request.getReserveStatus())
                 .build();
+
     }
 
     private void notifyBookingCreation(List<Booking> bookings) {

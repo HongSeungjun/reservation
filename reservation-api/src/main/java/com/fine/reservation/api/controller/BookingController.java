@@ -3,7 +3,6 @@ package com.fine.reservation.api.controller;
 import com.fine.reservation.api.dto.BookingNoResponse;
 import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.service.BookingService;
-import com.fine.reservation.domain.booking.model.Booking;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

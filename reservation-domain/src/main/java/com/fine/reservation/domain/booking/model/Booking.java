@@ -6,7 +6,7 @@ import com.fine.reservation.domain.enums.ReservationStatus;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
 
 @Getter
 @Builder(toBuilder = true)
@@ -35,20 +35,44 @@ public class Booking {
     private Integer result;
     private Integer firstBookingSeq;
 
-    public Booking withMachineNo(Long machineNo) {
+    public Booking changeMachine(Long newMachineNo) {
         return this.toBuilder()
-            .machineNo(machineNo)
-            .build();
+                .machineNo(newMachineNo)
+                .build();
     }
 
-    public Booking withSearchPhone() {
-        String pattern = "(\\d{3})[-]?(\\d{3,4})[-]?(\\d{4})";
-        String sp = null;
-        if (this.cellNumber != null && this.cellNumber.matches(pattern)) {
-            sp = this.cellNumber.substring(this.cellNumber.length() - 4);
+    public boolean isValidBookingTime() {
+        if (bookingStartAt == null || bookingEndAt == null) {
+            return false;
         }
-        return this.toBuilder()
-            .searchPhone(sp)
-            .build();
+
+        return bookingStartAt.isBefore(bookingEndAt) &&
+                !bookingStartAt.isBefore(LocalDateTime.now());
     }
+
+    public boolean isWithinMaxPeople() {
+        final int MAX_PEOPLE = 6;
+        return bookingPeople != null && bookingPeople > 0 && bookingPeople <= MAX_PEOPLE;
+    }
+
+    public boolean isValidTimeRange() {
+        if (bookingStartAt == null || bookingEndAt == null) {
+            return false;
+        }
+
+        long minutes = ChronoUnit.MINUTES.between(bookingStartAt, bookingEndAt);
+        return minutes >= 30 && minutes <= 240;
+
+    }
+
+    public Booking copyWithNewMachine(Long newMachineNo) {
+        return this.toBuilder()
+                .bookingNo(null)
+                .machineNo(newMachineNo)
+                .build();
+    }
+
+
+
+
 }
