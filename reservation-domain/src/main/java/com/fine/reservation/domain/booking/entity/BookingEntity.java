@@ -1,6 +1,7 @@
 package com.fine.reservation.domain.booking.entity;
 
 import com.fine.reservation.domain.enums.BookingChannel;
+import com.fine.reservation.domain.enums.GameMode;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -52,15 +53,16 @@ public class BookingEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(name = "reserve_no", nullable = false)
+    @Column(name = "reserve_no")
     private Long reserveNo;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "booking_channel", nullable = false)
     private BookingChannel bookingChannel;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "game_mode", nullable = false)
-    private Integer gameMode;
+    private GameMode gameMode;
 
     @Column(name = "game_duration_minutes", nullable = false)
     private Integer gameDurationMinutes;

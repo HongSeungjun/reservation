@@ -84,4 +84,13 @@ public class ReservationEntity {
     @Column(name = "room_count")
     private Integer roomCount;
 
+    public ReservationEntity approve() {
+        if (this.reserveStatus != ReservationStatus.REQUEST) {
+            throw new IllegalStateException("예약 승인을 할수 없습니다." + this.reserveStatus);
+        }
+        this.reserveStatus = ReservationStatus.APPROVAL;
+        return this;
+    }
+
 }
+

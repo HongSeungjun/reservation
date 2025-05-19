@@ -5,7 +5,7 @@ import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.TodayBookingResponse;
 import com.fine.reservation.api.mapper.BookingDtoMapper;
 import com.fine.reservation.api.service.BookingService;
-import com.fine.reservation.domain.booking.model.Booking;
+import com.fine.reservation.domain.booking.entity.BookingEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -39,7 +39,7 @@ public class BookingController {
     ) {
         LocalDate targetDate = startAt != null ? startAt : LocalDate.now();
 
-        List<Booking> todayBookings = bookingService.getBookingsByDate(targetDate);
+        List<BookingEntity> todayBookings = bookingService.getBookingsByDate(targetDate);
         return ResponseEntity.ok(bookingMapper.toTodayResponseList(todayBookings));
     }
 

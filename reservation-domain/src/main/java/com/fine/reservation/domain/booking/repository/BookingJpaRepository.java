@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-interface JpaBookingRepository extends JpaRepository<BookingEntity, Long> {
-    List<BookingEntity> findByBookingDateBetween(LocalDateTime start, LocalDateTime end);
+public interface BookingJpaRepository extends JpaRepository<BookingEntity, Long> {
+    List<BookingEntity> findByBookingStartAtBetween(LocalDateTime start, LocalDateTime end);
 
     List<BookingEntity> findByReserveNo(Long reserveNo);
 }
