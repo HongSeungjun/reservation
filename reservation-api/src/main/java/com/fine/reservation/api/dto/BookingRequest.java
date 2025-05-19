@@ -1,54 +1,51 @@
 package com.fine.reservation.api.dto;
 
 import com.fine.reservation.domain.enums.BookingChannel;
-import com.fine.reservation.domain.enums.GameMode;
+import com.fine.reservation.domain.enums.ReservationStatus;
 import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
+import lombok.Getter;
 import org.hibernate.validator.constraints.Range;
 import org.springframework.format.annotation.DateTimeFormat;
-import java.util.List;
 
 
-/*
-* builder 패턴 제거하고 생성자, 불변 객체를 이용
-* */
-public record BookingRequest(
-        @NotNull(message = "invalid parameter - machineNos")
-        List<Integer> machineNos,
+@Getter
+@Builder
+public class BookingRequest {
+    @NotNull(message = "invalid parameter - machineNos")
+    private Long[] machineNos;
 
-        @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-        @NotNull(message = "invalid parameter - bookingStartAt")
-        String bookingStartAt,
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @NotNull(message = "invalid parameter - bookingStartAt")
+    private String bookingStartAt;
 
-        @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-        @NotNull(message = "invalid parameter - bookingEndAt")
-        String bookingEndAt,
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @NotNull(message = "invalid parameter - bookingEndAt")
+    private String bookingEndAt;
 
-        @NotNull(message = "invalid parameter - peopleCount")
-        @Range(min = 1, max = 6, message = "peopleCount min 1 max 6")
-        Integer peopleCount,
+    @NotNull(message = "invalid parameter - bookingPeople")
+    @Range(min = 1, max = 6, message = "bookingPeople min 1 max 6")
+    private Integer bookingPeople;
 
-        @NotNull(message = "invalid parameter - holeCount")
-        Integer holeCount,
+    @NotNull(message = "invalid parameter - bookingPlayHole")
+    private Integer bookingPlayHole;
 
-        @NotNull(message = "invalid parameter - bookerName")
-        String  bookerName,
+    @NotNull(message = "invalid parameter - bookingName")
+    private String bookingName;
 
-        @NotNull(message = "invalid parameter - phoneNumber")
-        String  phoneNumber,
+    @NotNull(message = "invalid parameter - cellNumber")
+    private String cellNumber;
 
-        String  bookingMemo,
+    @NotNull(message = "invalid parameter - bookingChannel")
+    private BookingChannel bookingChannel;
 
-        @NotNull(message = "invalid parameter - bookingChannel")
-        BookingChannel bookingChannel,
+    @NotNull(message = "invalid parameter - gameMode")
+    private Integer gameMode;
 
-        @NotNull(message = "invalid parameter - gameMode")
-        GameMode gameMode,
+    private Integer gameTime;
+    private String bookingMemo;
 
-        @NotNull(message = "invalid parameter - gameDurationMinutes")
-        Integer gameDurationMinutes,
+    private Long reserveNo;
 
-        Long    reserveNo,
-
-        @NotNull
-        Integer shopNo
-) {}
+    private ReservationStatus reserveStatus;
+}

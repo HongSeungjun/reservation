@@ -1,47 +1,9 @@
-# IntelliJ IDEA
-.idea/
-*.iml
-*.iws
-*.ipr
-out/
-.idea_modules/
+# Ignore Gradle project-specific cache directory
+.gradle
 
-# 컴파일된 클래스 파일
-*.class
-
-# 로그 파일
-*.log
-logs/
-
-# 빌드 디렉토리
-/target/
+# Ignore Gradle build output directory
+build
+/.gradle/
 /build/
-
-# Gradle
-.gradle/
-build/
-
-# Maven
-.mvn/
-mvnw
-mvnw.cmd
-
-# Mac OS
-.DS_Store
-
-# 패키지 파일
-*.jar
-*.war
-*.ear
-*.zip
-*.tar.gz
-
-# Spring Boot 설정
-application-local.yml
-application-local.properties
-
-# 환경 변수
-.env
-
-# JUnit
-/junit/
+/services/*/build/
+/**/out/
