@@ -3,7 +3,6 @@ package com.fine.reservation.domain.enums;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-import java.util.Arrays;
 
 @Getter
 @AllArgsConstructor
@@ -22,27 +21,4 @@ public enum ReservationStatus {
     private final String value;
     private final String description;
 
-    public static ReservationStatus findByValue(int value) {
-        return Arrays.stream(values())
-            .filter(s -> s.value.equals(String.valueOf(value)))
-            .findAny()
-            .orElse(null);
-    }
-
-    public boolean canTransitionTo(ReservationStatus next) {
-        switch (this) {
-            case REQUEST:
-                return next == APPROVAL
-                    || next == CUSTOMER_CANCEL_BEFORE_APPROVAL
-                    || next == STORE_CANCEL_BEFORE_APPROVAL;
-            case APPROVAL:
-                return next == CUSTOMER_CANCEL_AFTER_APPROVAL
-                    || next == STORE_CANCEL_AFTER_APPROVAL
-                    || next == NO_SHOW_AFTER_APPROVAL
-                    || next == AUTO_CANCEL
-                    || next == COMPLETED_USE;
-            default:
-                return false;
-        }
-    }
 }

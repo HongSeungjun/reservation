@@ -1,7 +1,9 @@
 package com.fine.reservation.domain.booking.entity;
 
+import com.fine.reservation.domain.enums.BookingChannel;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -14,75 +16,53 @@ public class BookingEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "booking_seq", nullable = false)
-    private Long bookingSeq;
+    @Column(name = "booking_no", nullable = false)
+    private Long bookingNo;
 
-    @Column(name = "rgn_no")
-    private Integer rgnNo;
+    @Column(name = "shop_no", nullable = false)
+    private Integer shopNo;
 
-    @Column(name = "work_no")
-    private Integer workNo;
+    @Column(name = "machine_no", nullable = false)
+    private Integer machineNo;
 
-    @Column(name = "name", length = 300)
-    private String name;
+    @Column(name = "booker_name", length = 300, nullable = false)
+    private String bookerName;
 
-    @Column(name = "phone", length = 300)
-    private String phone;
+    @Column(name = "phone_number", length = 300, nullable = false)
+    private String phoneNumber;
 
-    @Column(name = "player_cnt")
-    private Integer playerCnt;
+    @Column(name = "people_count", nullable = false)
+    private Integer peopleCount;
 
-    @Column(name = "play_hole")
-    private Integer playHole;
+    @Column(name = "hole_count", nullable = false)
+    private Integer holeCount;
 
-    @Column(name = "reg_nm", length = 20)
-    private String regNm;
+    @Column(name = "booking_memo", length = 1000)
+    private String bookingMemo;
 
-    @Column(name = "memo", length = 1000)
-    private String memo;
+    @Column(name = "booking_start_at", nullable = false)
+    private LocalDateTime bookingStartAt;
 
-    @Column(name = "booking_date")
-    private LocalDateTime bookingDate;
+    @Column(name = "booking_end_at", nullable = false)
+    private LocalDateTime bookingEndAt;
 
-    @Column(name = "end_date")
-    private LocalDateTime endDate;
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
-    @Column(name = "reg_dt")
-    private LocalDateTime regDt;
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
-    @Column(name = "mod_dt")
-    private LocalDateTime modDt;
-
-    @Column(name = "reserve_no")
+    @Column(name = "reserve_no", nullable = false)
     private Long reserveNo;
 
-    @Column(name = "booking_channel")
-    private Integer bookingChannel;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "booking_channel", nullable = false)
+    private BookingChannel bookingChannel;
 
-    @Column(name = "search_phone", length = 4)
-    private String searchPhone;
-
-    @Column(name = "game_mode")
+    @Column(name = "game_mode", nullable = false)
     private Integer gameMode;
 
-    @Column(name = "game_time")
-    private Integer gameTime;
+    @Column(name = "game_duration_minutes", nullable = false)
+    private Integer gameDurationMinutes;
 
-    @Column(name = "booking_name", length = 100)
-    private String bookingName;
-
-    @Column(name = "booking_phone_number", length = 20)
-    private String bookingPhoneNumber;
-
-    @Column(name = "first_booking_date")
-    private LocalDateTime firstBookingDate;
-
-    @Column(name = "first_booking_end_date")
-    private LocalDateTime firstBookingEndDate;
-
-    @Column(name = "fixed_yn", length = 1)
-    private String fixedYn;
-
-    @Column(name = "alarm_status")
-    private Integer alarmStatus;
 }
