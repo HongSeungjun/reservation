@@ -2,7 +2,7 @@ package com.fine.reservation.api.controller;
 
 import com.fine.reservation.api.dto.BookingNoResponse;
 import com.fine.reservation.api.dto.BookingRequest;
-import com.fine.reservation.api.dto.TodayBookingResponse;
+import com.fine.reservation.api.dto.BookingResponse;
 import com.fine.reservation.api.service.notification.NotificationService;
 import com.fine.reservation.api.service.notification.PushNotificationService;
 import com.fine.reservation.api.service.notification.RedisCacheService;
@@ -257,14 +257,16 @@ class BookingControllerIntegrationTest {
     @Test
     @DisplayName("특정 날짜 기준 예약 목록 조회")
     void getBookingsBySpecificDateTest() {
-        LocalDate target = LocalDate.now().plusDays(1);
-        String dateStr = target.toString();
+        LocalDate startAt = LocalDate.now().plusDays(1);
+        LocalDate endAt = LocalDate.now().plusDays(2);
+        String startAtStr = startAt.toString();
+        String endAtAtStr = endAt.toString();
 
-        ResponseEntity<List<TodayBookingResponse>> response = restTemplate.exchange(
-                "http://localhost:" + port + "/api/bookings/today?startAt=" + dateStr,
+        ResponseEntity<List<BookingResponse>> response = restTemplate.exchange(
+                "http://localhost:" + port + "/bookings?startAt=" + startAtStr + "&endAt=" + endAtAtStr,
                 HttpMethod.GET,
                 null,
-                new ParameterizedTypeReference<List<TodayBookingResponse>>() {}
+                new ParameterizedTypeReference<List<BookingResponse>>() {}
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

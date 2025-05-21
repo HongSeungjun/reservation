@@ -51,11 +51,11 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public List<BookingEntity> getBookingsByDate(LocalDate date) {
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+    public List<BookingEntity> getBookingsByDateRange(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime queryStartDateTime = startDate.atStartOfDay();
+        LocalDateTime queryEndDateTime = endDate.atTime(LocalTime.MAX);
 
-        return bookingJpaRepository.findByBookingStartAtBetween(startOfDay, endOfDay);
+        return bookingJpaRepository.findByBookingStartAtBetween(queryStartDateTime, queryEndDateTime);
     }
 
 

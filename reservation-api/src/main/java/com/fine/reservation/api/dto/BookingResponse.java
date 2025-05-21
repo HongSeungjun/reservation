@@ -4,7 +4,7 @@ import com.fine.reservation.domain.enums.BookingChannel;
 import com.fine.reservation.domain.enums.GameMode;
 import java.time.LocalDateTime;
 
-public record TodayBookingResponse(
+public record BookingResponse(
         Long bookingNo,
         Long machineNo,
         LocalDateTime bookingStartAt,

@@ -1,6 +1,6 @@
 package com.fine.reservation.api.mapper;
 
-import com.fine.reservation.api.dto.TodayBookingResponse;
+import com.fine.reservation.api.dto.BookingResponse;
 import com.fine.reservation.domain.booking.entity.BookingEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -15,7 +15,7 @@ public interface BookingDtoMapper {
     @Mapping(target = "bookingName", source = "bookerName")
     @Mapping(target = "cellNumber", source = "phoneNumber")
     @Mapping(target = "gameTime", source = "gameDurationMinutes")
-    TodayBookingResponse toTodayResponse(BookingEntity booking);
+    BookingResponse toResponse(BookingEntity booking);
 
-    List<TodayBookingResponse> toTodayResponseList(List<BookingEntity> bookings);
+    List<BookingResponse> toResponseList(List<BookingEntity> bookings);
 }
