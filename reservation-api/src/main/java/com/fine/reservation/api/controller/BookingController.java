@@ -1,8 +1,9 @@
 package com.fine.reservation.api.controller;
 
-import com.fine.reservation.api.dto.BookingNoResponse;
+import com.fine.reservation.api.dto.BookingDeleteRequest;
 import com.fine.reservation.api.dto.BookingRequest;
-import com.fine.reservation.api.dto.TodayBookingResponse;
+import com.fine.reservation.api.dto.BookingResponse;
+import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
 import com.fine.reservation.api.mapper.BookingDtoMapper;
 import com.fine.reservation.api.service.BookingService;
 import com.fine.reservation.domain.booking.entity.BookingEntity;
@@ -10,7 +11,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -18,32 +18,49 @@ import java.util.List;
 
 
 @RestController
-@RequestMapping("/api/bookings")
+@RequestMapping("/bookings")
 @RequiredArgsConstructor
-@Validated
 public class BookingController {
 
     private final BookingService bookingService;
     private final BookingDtoMapper bookingMapper;
 
     @PostMapping
-    public ResponseEntity<BookingNoResponse> book(@RequestBody @Valid BookingRequest req) {
-        List<Long> result = bookingService.createBookings(req);
-        return ResponseEntity.ok(new BookingNoResponse(result));
+    public ResponseEntity<List<Long>> book(@RequestBody @Valid BookingRequest req) {
+        return ResponseEntity.ok(bookingService.createBookings(req));
     }
 
-    @GetMapping("/today")
-    public ResponseEntity<List<TodayBookingResponse>> getTodayBookings(
-            @RequestParam("startAt") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startAt
+    @PutMapping("/{bookingNo}")
+    public ResponseEntity<List<Long>> updateBooking(@PathVariable Long bookingNo, @RequestBody @Valid BookingRequest req) {
+        return ResponseEntity.ok(bookingService.updateBookings(bookingNo, req));
+    }
+
+    @PatchMapping("/{bookingNo}")
+    public ResponseEntity updateBookingTime(@PathVariable Long bookingNo, @RequestBody @Valid BookingUpdateTimeRequest req) {
+        bookingService.updateReservationTime(
+                bookingNo, req);
+        return ResponseEntity.accepted().build();
+    }
+
+    @DeleteMapping("/{bookingNo}")
+    ResponseEntity delete(@PathVariable Long bookingNo, @Valid @RequestBody BookingDeleteRequest request) {
+
+        bookingService.deleteBooking(bookingNo, request);
+
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<BookingResponse>> getBookings(@RequestParam("startAt") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startAt, @RequestParam("endAt") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endAt
 
     ) {
-        LocalDate targetDate = startAt != null ? startAt : LocalDate.now();
+        if (startAt.isAfter(endAt)) {
+            throw new IllegalArgumentException("종료 날짜(endAt)는 시작 날짜(startAt)보다 이전일 수 없습니다.");
+        }
 
-        List<BookingEntity> todayBookings = bookingService.getBookingsByDate(targetDate);
-        return ResponseEntity.ok(bookingMapper.toTodayResponseList(todayBookings));
+        List<BookingEntity> bookings = bookingService.getBookingsByDateRange(startAt, endAt);
+        return ResponseEntity.ok(bookingMapper.toResponseList(bookings));
     }
-
-
 
 
 }

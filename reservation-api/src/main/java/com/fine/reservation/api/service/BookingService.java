@@ -1,24 +1,30 @@
 package com.fine.reservation.api.service;
 
+import com.fine.reservation.api.dto.BookingDeleteRequest;
 import com.fine.reservation.api.dto.BookingRequest;
+import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
 import com.fine.reservation.api.service.notification.NotificationService;
 import com.fine.reservation.api.service.notification.PushNotificationService;
 import com.fine.reservation.api.service.notification.RedisCacheService;
 import com.fine.reservation.api.service.notification.WebSocketService;
 import com.fine.reservation.domain.booking.entity.BookingEntity;
-import com.fine.reservation.domain.booking.repository.BookingJpaRepository;
+import com.fine.reservation.domain.booking.repository.BookingRepository;
 import com.fine.reservation.domain.enums.ReservationStatus;
+import com.fine.reservation.domain.reservation.entity.PenaltyCountEntity;
 import com.fine.reservation.domain.reservation.entity.ReservationEntity;
-import com.fine.reservation.domain.reservation.repository.ReservationJpaRepository;
+import com.fine.reservation.domain.reservation.repository.PenaltyCountRepository;
+import com.fine.reservation.domain.reservation.repository.ReservationRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,8 +32,10 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class BookingService {
-    private final BookingJpaRepository bookingJpaRepository;
-    private final ReservationJpaRepository reservationRepository;
+    private final BookingRepository bookingRepository;
+    // reservation repository를 가져와서 써도 되는지
+    private final ReservationRepository reservationRepository;
+    private final PenaltyCountRepository penaltyCountRepository;
 
     private final NotificationService notificationService;
     private final PushNotificationService pushService;
@@ -37,34 +45,171 @@ public class BookingService {
     @Transactional
     public List<Long> createBookings(BookingRequest request) {
         if (request.reserveNo() != null) {
-            updateReservationStatus(request.reserveNo());
+            approveReservation(request.reserveNo());
         }
 
         List<BookingEntity> createdBookings = createMultipleBookings(request);
 
         notifyBookingCreation(createdBookings);
 
-        return createdBookings.stream()
-                .map(BookingEntity::getBookingNo)
-                .toList();
+        return createdBookings.stream().map(BookingEntity::getBookingNo).toList();
 
     }
 
     @Transactional(readOnly = true)
-    public List<BookingEntity> getBookingsByDate(LocalDate date) {
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+    public List<BookingEntity> getBookingsByDateRange(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime queryStartDateTime = startDate.atStartOfDay();
+        LocalDateTime queryEndDateTime = endDate.atTime(LocalTime.MAX);
 
-        return bookingJpaRepository.findByBookingStartAtBetween(startOfDay, endOfDay);
+        return bookingRepository.findByBookingStartAtBetween(queryStartDateTime, queryEndDateTime);
+    }
+
+    @Transactional
+    public List<Long> updateBookings(Long bookingNo, BookingRequest request) {
+        for (Integer machineNo : request.machineNos()) {
+            boolean overlap = bookingRepository.existsOverlap(machineNo, request.bookingStartAt(), request.bookingEndAt(), bookingNo);
+            if (overlap) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "중복 예약이 존재합니다: machineNo=" + machineNo);
+            }
+        }
+
+        List<Long> updatedBookingNos;
+        BookingEntity originalEntity = bookingRepository.findById(bookingNo)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다: " + bookingNo));
+
+        if (request.machineNos().size() == 1) {
+            BookingEntity updatedEntity = buildUpdatedBookingEntity(originalEntity, request);
+            BookingEntity savedEntity = bookingRepository.save(updatedEntity);
+            updatedBookingNos = List.of(savedEntity.getBookingNo());
+
+        } else {
+            deleteForUpdate(bookingNo, request);
+            List<BookingEntity> createdBookings = createMultipleBookings(request);
+            updatedBookingNos = createdBookings.stream().map(BookingEntity::getBookingNo).toList();
+        }
+
+        if (!originalEntity.getBookingStartAt().isEqual(request.bookingStartAt())
+                || !originalEntity.getBookingEndAt().isEqual(request.bookingEndAt())) {
+            log.info("Booking time changed for bookingNo: {}. Triggering notifications.", bookingNo);
+            // TODO : 예약시간 변경시에만 예약 시간 알림톡, 웹소켓 등 외부 API 호출
+        }
+
+        return updatedBookingNos;
+    }
+
+    @Transactional
+    public void updateReservationTime(Long bookingNo, BookingUpdateTimeRequest request) {
+        BookingEntity originalEntity = bookingRepository.findById(bookingNo)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약 정보를 찾을 수 없습니다: " + bookingNo));
+
+        boolean overlap = bookingRepository.existsOverlap(
+                request.machineNo(),
+                request.bookingStartAt(),
+                request.bookingEndAt(),
+                bookingNo
+        );
+
+        if (overlap) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "요청하신 시간에 해당 방(" + request.machineNo() + "번)은 이미 사용 중입니다.");
+        }
+
+        BookingEntity updatedEntity = buildBookingEntityForTimeUpdate(originalEntity, request);
+
+        bookingRepository.save(updatedEntity);
+
+        webSocketService.broadcastBookingUpdate(updatedEntity);
     }
 
 
-    private void updateReservationStatus(Long reservationNo) {
-        ReservationEntity reservation = reservationRepository.findById(reservationNo)
-                .orElseThrow(() -> new RuntimeException("예약 정보를 찾을 수 없습니다: " + reservationNo));
+    @Transactional
+    public void deleteBooking(Long bookingNo, BookingDeleteRequest request) {
+        if (request.reserveNo() != null) {
+            processReservationRelatedDeletion(request);
+        } else if (request.bookingNo() != null) {
+            deleteSingleBookingSchedule(request);
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reserveNo 또는 bookingNo 둘 중 하나는 반드시 필요합니다.");
+        }
+
+        /*
+         * event 발행
+         * */
+    }
+
+    private void processReservationRelatedDeletion(BookingDeleteRequest request) {
+        ReservationEntity reservation = reservationRepository.findById(request.reserveNo())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 예약 정보를 찾을 수 없습니다: " + request.reserveNo()));
+
+        validateReservationForDeletion(reservation, request.shopNo());
+
+        if (request.reservationStatus() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "예약 상태 변경을 위한 reservationStatus 값이 필요합니다.");
+        }
+
+        updateReservationStatusAndApplyPenalty(reservation, request.reservationStatus(), request.penalty());
+
+        int deletedSchedules = bookingRepository.deleteByReserveNoAndShopNo(request.reserveNo(), request.shopNo());
+        log.info("{} booking_schedule entries deleted for reserveNo: {}", deletedSchedules, request.reserveNo());
+    }
+
+    private void validateReservationForDeletion(ReservationEntity reservation, Integer commandShopNo) {
+        if (!reservation.getShopNo().equals(commandShopNo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "매장 번호가 일치하지 않아 예약 관련 작업을 진행할 수 없습니다.");
+        }
+
+        ReservationStatus currentStatus = reservation.getReserveStatus();
+        if (currentStatus.getKey() > 30) {                // 40
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 취소되었거나 완료된 예약으로, 추가 작업을 진행할 수 없습니다. 현재 상태: " + currentStatus.getDescription());
+        }
+    }
+
+    private void updateReservationStatusAndApplyPenalty(ReservationEntity reservation, ReservationStatus newStatus, boolean applyPenalty) {
+        // 예약 상태 변경
+        reservation.updateStauts(newStatus);
+        reservationRepository.save(reservation);
+
+        log.info("Reservation reserveNo: {} status updated to: {}", reservation.getReserveNo(), newStatus);
+
+        if (applyPenalty) {
+            Integer userNo = reservation.getUserNo(); // ReservationEntity에 getUsrNo()가 있다고 가정
+            if (userNo == null) {
+                log.warn("Cannot apply penalty for reserveNo: {} because usrNo is null.", reservation.getReserveNo());
+                return;
+            }
+
+            int penaltyCount = (newStatus == ReservationStatus.NO_SHOW_AFTER_APPROVAL) ? 3 : 1;
+
+            LocalDateTime penaltyStartAt = LocalDateTime.now();
+            LocalDateTime penaltyEndAt = LocalDateTime.now().plusDays(29).withHour(23).withMinute(59).withSecond(59);
+
+            log.info("Penalty (count: {}) would be saved for usrNo: {}, reserveNo: {}. (savePenalty method needs implementation in ReservationRepository)",
+                    penaltyCount, userNo, reservation.getReserveNo());
+
+            penaltyCountRepository.save(
+                    PenaltyCountEntity.builder()
+                            .totalPenalty(penaltyCount)
+                            .startAt(penaltyStartAt)
+                            .endAt(penaltyEndAt)
+                            .userNo(userNo)
+                            .build());
+        }
+    }
+
+    private void deleteSingleBookingSchedule(BookingDeleteRequest command) {
+        int deletedCount = bookingRepository.deleteByBookingNoAndShopNo(command.bookingNo(), command.shopNo());
+        if (deletedCount < 1) {
+            log.warn("Booking schedule deletion failed for bookingNo: {} and shopNo: {}. No rows affected.",
+                    command.bookingNo(), command.shopNo());
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 방 예약(스케줄) 정보를 찾을 수 없거나 매장 정보가 일치하지 않습니다: bookingNo=" + command.bookingNo());
+        }
+        log.info("Booking schedule deleted for bookingNo: {}", command.bookingNo());
+    }
+
+    private void approveReservation(Long reservationNo) {
+        ReservationEntity reservation = reservationRepository.findById(reservationNo).orElseThrow(() -> new RuntimeException("예약 정보를 찾을 수 없습니다: " + reservationNo));
 
         if (reservation.getReserveStatus() != ReservationStatus.REQUEST) {
-            throw new RuntimeException("유효하지 않은 예약 상태입니다: " + reservation.getReserveStatus());
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ("유효하지 않은 예약 상태입니다: " + reservation.getReserveStatus()));
         }
 
         // 상태 업데이트 어떻게 하는것이 좋은지
@@ -77,20 +222,19 @@ public class BookingService {
 
         for (Integer machineNo : request.machineNos()) {
             BookingEntity booking = createSingleBooking(request, machineNo);
-            bookings.add(bookingJpaRepository.save(booking));
+            bookings.add(bookingRepository.save(booking));
         }
 
         return bookings;
     }
 
     private BookingEntity createSingleBooking(BookingRequest request, Integer machineNo) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         return BookingEntity.builder()
                 .shopNo(request.shopNo())
                 .machineNo(machineNo)
-                .bookingStartAt(LocalDateTime.parse(request.bookingStartAt(), formatter))
-                .bookingEndAt(LocalDateTime.parse(request.bookingEndAt(), formatter))
+                .bookingStartAt(request.bookingStartAt())
+                .bookingEndAt(request.bookingEndAt())
                 .peopleCount(request.peopleCount())
                 .holeCount(request.holeCount())
                 .bookerName(request.bookerName())
@@ -112,7 +256,70 @@ public class BookingService {
             pushService.sendBookingNotification(booking);
             webSocketService.broadcastBookingUpdate(booking);
         }
-
         cacheService.updateBookingCache(bookings);
     }
+
+
+    private void deleteForUpdate(Long bookingNo, BookingRequest request) {
+        if (request.reserveNo() == null) {
+            int result = bookingRepository.deleteByBookingNoAndShopNo(bookingNo, request.shopNo());
+            if (result < 1) {
+                throw new IllegalStateException("booking delete fail");
+            }
+        } else {
+            int result = bookingRepository.deleteByReserveNoAndShopNo(request.reserveNo(), request.shopNo());
+            if (result < 1) {
+                throw new IllegalStateException("reserve booking delete fail");
+            }
+        }
+    }
+
+    private BookingEntity buildUpdatedBookingEntity(BookingEntity originalEntity, BookingRequest request) {
+        Integer machineToUpdate = request.machineNos().get(0);
+
+        return BookingEntity.builder()
+                .bookingNo(originalEntity.getBookingNo())
+                .createdAt(originalEntity.getCreatedAt())
+
+                .shopNo(request.shopNo())
+                .machineNo(machineToUpdate)
+                .reserveNo(request.reserveNo())
+                .bookingStartAt(request.bookingStartAt())
+                .bookingEndAt(request.bookingEndAt())
+                .peopleCount(request.peopleCount())
+                .holeCount(request.holeCount())
+                .bookerName(request.bookerName())
+                .phoneNumber(request.phoneNumber())
+                .bookingMemo(request.bookingMemo())
+                .bookingChannel(request.bookingChannel())
+                .gameMode(request.gameMode())
+                .gameDurationMinutes(request.gameDurationMinutes())
+
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    private BookingEntity buildBookingEntityForTimeUpdate(BookingEntity originalEntity, BookingUpdateTimeRequest request) {
+        return BookingEntity.builder()
+                .bookingNo(originalEntity.getBookingNo())
+                .shopNo(originalEntity.getShopNo())
+                .peopleCount(originalEntity.getPeopleCount())
+                .holeCount(originalEntity.getHoleCount())
+                .bookerName(originalEntity.getBookerName())
+                .phoneNumber(originalEntity.getPhoneNumber())
+                .bookingMemo(originalEntity.getBookingMemo())
+                .bookingChannel(originalEntity.getBookingChannel())
+                .gameMode(originalEntity.getGameMode())
+                .gameDurationMinutes(originalEntity.getGameDurationMinutes())
+                .reserveNo(originalEntity.getReserveNo())
+                .createdAt(originalEntity.getCreatedAt())
+
+                .machineNo(request.machineNo())
+                .bookingStartAt(request.bookingStartAt())
+                .bookingEndAt(request.bookingEndAt())
+
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
 }
