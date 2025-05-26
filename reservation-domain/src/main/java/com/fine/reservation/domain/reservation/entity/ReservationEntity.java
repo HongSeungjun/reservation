@@ -92,5 +92,9 @@ public class ReservationEntity {
         return this;
     }
 
+    public void updateStauts(ReservationStatus newStatus) {
+        this.reserveStatus = newStatus;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
 

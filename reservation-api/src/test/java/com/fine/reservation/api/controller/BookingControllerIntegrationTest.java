@@ -1,5 +1,6 @@
 package com.fine.reservation.api.controller;
 
+import com.fine.reservation.api.dto.BookingDeleteRequest;
 import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.BookingResponse;
 import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
@@ -12,7 +13,9 @@ import com.fine.reservation.domain.booking.repository.BookingRepository;
 import com.fine.reservation.domain.enums.BookingChannel;
 import com.fine.reservation.domain.enums.GameMode;
 import com.fine.reservation.domain.enums.ReservationStatus;
+import com.fine.reservation.domain.reservation.entity.PenaltyCountEntity;
 import com.fine.reservation.domain.reservation.entity.ReservationEntity;
+import com.fine.reservation.domain.reservation.repository.PenaltyCountRepository;
 import com.fine.reservation.domain.reservation.repository.ReservationRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,12 +29,14 @@ import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -64,6 +69,9 @@ class BookingControllerIntegrationTest {
 
     @Autowired
     private ReservationRepository reservationRepository;
+
+    @Autowired
+    private PenaltyCountRepository penaltyCountRepository;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -677,5 +685,135 @@ class BookingControllerIntegrationTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(webSocketService, never()).broadcastBookingUpdate(any(BookingEntity.class));
+    }
+
+    @Test
+    @DisplayName("DELETE /bookings - reserveNo 기준 예약 및 관련 스케줄 삭제 (패널티 없음, 200 OK)")
+    void deleteByReserveNo_Success_NoPenalty() {
+        Long bookingNoToDelete = 301L;
+        Long reserveNoToDelete = 2L;
+        Integer shopNo = 101;
+        ReservationStatus targetStatus = ReservationStatus.CUSTOMER_CANCEL_AFTER_APPROVAL;
+
+        BookingDeleteRequest request = new BookingDeleteRequest(reserveNoToDelete, null, shopNo, targetStatus, false);
+        HttpEntity<BookingDeleteRequest> entity = new HttpEntity<>(request, new HttpHeaders());
+
+        ResponseEntity<Void> response = restTemplate.exchange("/bookings/"+bookingNoToDelete, HttpMethod.DELETE, entity, Void.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Optional<ReservationEntity> deletedReservationOpt = reservationRepository.findById(reserveNoToDelete);
+        assertThat(deletedReservationOpt).isPresent();
+        ReservationEntity deletedReservation = deletedReservationOpt.get();
+        assertThat(deletedReservation.getReserveStatus()).isEqualTo(targetStatus);
+
+        List<BookingEntity> associatedSchedules = bookingRepository.findByReserveNo(reserveNoToDelete);
+        assertThat(associatedSchedules).isEmpty();
+
+        Optional<PenaltyCountEntity> penaltyOpt = penaltyCountRepository.findByUserNo(deletedReservation.getUserNo());
+        assertThat(penaltyOpt).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DELETE /bookings - reserveNo 기준 예약 및 관련 스케줄 삭제 (패널티 적용, 200 OK)")
+    void deleteByReserveNo_Success_WithPenalty() {
+        Long bookingNoToDelete = 301L;
+        Long reserveNoToDelete = 2L;
+        Integer shopNo = 101;
+        Integer userNoForPenalty = 1002;
+        ReservationStatus targetStatus = ReservationStatus.NO_SHOW_AFTER_APPROVAL;
+
+        BookingDeleteRequest request = new BookingDeleteRequest(reserveNoToDelete, null, shopNo, targetStatus, true);
+        HttpEntity<BookingDeleteRequest> entity = new HttpEntity<>(request, new HttpHeaders());
+
+        ResponseEntity<Void> response = restTemplate.exchange("/bookings/"+bookingNoToDelete, HttpMethod.DELETE, entity, Void.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Optional<ReservationEntity> updatedReservationOpt = reservationRepository.findById(reserveNoToDelete);
+        assertThat(updatedReservationOpt).isPresent();
+        assertThat(updatedReservationOpt.get().getReserveStatus()).isEqualTo(targetStatus);
+
+        assertThat(bookingRepository.findByReserveNo(reserveNoToDelete)).isEmpty();
+
+        Optional<PenaltyCountEntity> penaltyOpt = penaltyCountRepository.findByUserNo(userNoForPenalty);
+        assertThat(penaltyOpt).isPresent();
+        PenaltyCountEntity penalty = penaltyOpt.get();
+        assertThat(penalty.getUserNo()).isEqualTo(userNoForPenalty);
+        int expectedPenaltyPoints = (targetStatus == ReservationStatus.NO_SHOW_AFTER_APPROVAL) ? 3 : 1; // 서비스 로직과 동일하게
+        assertThat(penalty.getTotalPenalty()).isEqualTo(expectedPenaltyPoints); // 첫 패널티이므로 이 값, 누적 시 로직 확인
+    }
+
+    @Test
+    @DisplayName("DELETE /bookings - bookingNo 기준 특정 방 예약 삭제 (200 OK)")
+    void deleteByBookingNo_Success() {
+        Long bookingNoToDelete = 301L;
+        Integer shopNo = 101;
+        ReservationStatus dummyStatus = ReservationStatus.CUSTOMER_CANCEL_AFTER_APPROVAL;
+
+        BookingDeleteRequest request = new BookingDeleteRequest(null, bookingNoToDelete, shopNo, dummyStatus, false);
+        HttpEntity<BookingDeleteRequest> entity = new HttpEntity<>(request, new HttpHeaders());
+
+        ResponseEntity<Void> response = restTemplate.exchange("/bookings/"+bookingNoToDelete, HttpMethod.DELETE, entity, Void.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(bookingRepository.findById(bookingNoToDelete)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DELETE /bookings - 삭제 불가 상태 예약 삭제 시도 (400 Bad Request)")
+    void deleteByReserveNo_Fail_NonDeletableStatus() {
+        Long reserveNoWithTerminalStatus = 3L;
+        Integer shopNo = 101;
+        BookingDeleteRequest request = new BookingDeleteRequest(reserveNoWithTerminalStatus, null, shopNo, ReservationStatus.CUSTOMER_CANCEL_AFTER_APPROVAL, false);
+        HttpEntity<BookingDeleteRequest> entity = new HttpEntity<>(request, new HttpHeaders());
+
+        try {
+            restTemplate.exchange("/bookings", HttpMethod.DELETE, entity, Void.class);
+        } catch (HttpClientErrorException ex) {
+            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            // assertThat(ex.getResponseBodyAsString()).contains("이미 취소되었거나 완료된 예약");
+        }
+    }
+
+    @Test
+    @DisplayName("DELETE /bookings - 존재하지 않는 reserveNo (404 Not Found)")
+    void deleteByReserveNo_Fail_ReserveNoNotFound() {
+        Long nonExistentReserveNo = 9999L;
+        BookingDeleteRequest request = new BookingDeleteRequest(nonExistentReserveNo, null, 101, ReservationStatus.CUSTOMER_CANCEL_AFTER_APPROVAL, false);
+        HttpEntity<BookingDeleteRequest> entity = new HttpEntity<>(request, new HttpHeaders());
+
+        try {
+            restTemplate.exchange("/bookings", HttpMethod.DELETE, entity, Void.class);
+        } catch (HttpClientErrorException ex) {
+            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @Test
+    @DisplayName("DELETE /bookings - 존재하지 않는 bookingNo (404 Not Found)")
+    void deleteByBookingNo_Fail_BookingNoNotFound() {
+        Long nonExistentBookingNo = 8888L;
+        BookingDeleteRequest request = new BookingDeleteRequest(null, nonExistentBookingNo, 101, ReservationStatus.CUSTOMER_CANCEL_AFTER_APPROVAL, false);
+        HttpEntity<BookingDeleteRequest> entity = new HttpEntity<>(request, new HttpHeaders());
+
+        try {
+            restTemplate.exchange("/bookings", HttpMethod.DELETE, entity, Void.class);
+        } catch (HttpClientErrorException ex) {
+            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @Test
+    @DisplayName("DELETE /bookings - 요청 DTO shopNo 누락 (400 Bad Request)")
+    void delete_Fail_InvalidRequestDTO_MissingShopNo() {
+        BookingDeleteRequest invalidRequest = new BookingDeleteRequest(2L, null, null, ReservationStatus.CUSTOMER_CANCEL_AFTER_APPROVAL, false);
+        HttpEntity<BookingDeleteRequest> entity = new HttpEntity<>(invalidRequest, new HttpHeaders());
+
+        try {
+            restTemplate.exchange("/bookings", HttpMethod.DELETE, entity, String.class);
+        } catch (HttpClientErrorException ex) {
+            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
     }
 }

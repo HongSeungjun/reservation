@@ -1,8 +1,8 @@
 package com.fine.reservation.api.service;
 
+import com.fine.reservation.api.dto.BookingDeleteRequest;
 import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
-import com.fine.reservation.api.mapper.BookingDtoMapper;
 import com.fine.reservation.api.service.notification.NotificationService;
 import com.fine.reservation.api.service.notification.PushNotificationService;
 import com.fine.reservation.api.service.notification.RedisCacheService;
@@ -10,7 +10,9 @@ import com.fine.reservation.api.service.notification.WebSocketService;
 import com.fine.reservation.domain.booking.entity.BookingEntity;
 import com.fine.reservation.domain.booking.repository.BookingRepository;
 import com.fine.reservation.domain.enums.ReservationStatus;
+import com.fine.reservation.domain.reservation.entity.PenaltyCountEntity;
 import com.fine.reservation.domain.reservation.entity.ReservationEntity;
+import com.fine.reservation.domain.reservation.repository.PenaltyCountRepository;
 import com.fine.reservation.domain.reservation.repository.ReservationRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     // reservation repository를 가져와서 써도 되는지
     private final ReservationRepository reservationRepository;
+    private final PenaltyCountRepository penaltyCountRepository;
 
     private final NotificationService notificationService;
     private final PushNotificationService pushService;
@@ -115,6 +118,91 @@ public class BookingService {
         bookingRepository.save(updatedEntity);
 
         webSocketService.broadcastBookingUpdate(updatedEntity);
+    }
+
+
+    @Transactional
+    public void deleteBooking(Long bookingNo, BookingDeleteRequest request) {
+        if (request.reserveNo() != null) {
+            processReservationRelatedDeletion(request);
+        } else if (request.bookingNo() != null) {
+            deleteSingleBookingSchedule(request);
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reserveNo 또는 bookingNo 둘 중 하나는 반드시 필요합니다.");
+        }
+
+        /*
+         * event 발행
+         * */
+    }
+
+    private void processReservationRelatedDeletion(BookingDeleteRequest request) {
+        ReservationEntity reservation = reservationRepository.findById(request.reserveNo())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 예약 정보를 찾을 수 없습니다: " + request.reserveNo()));
+
+        validateReservationForDeletion(reservation, request.shopNo());
+
+        if (request.reservationStatus() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "예약 상태 변경을 위한 reservationStatus 값이 필요합니다.");
+        }
+
+        updateReservationStatusAndApplyPenalty(reservation, request.reservationStatus(), request.penalty());
+
+        int deletedSchedules = bookingRepository.deleteByReserveNoAndShopNo(request.reserveNo(), request.shopNo());
+        log.info("{} booking_schedule entries deleted for reserveNo: {}", deletedSchedules, request.reserveNo());
+    }
+
+    private void validateReservationForDeletion(ReservationEntity reservation, Integer commandShopNo) {
+        if (!reservation.getShopNo().equals(commandShopNo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "매장 번호가 일치하지 않아 예약 관련 작업을 진행할 수 없습니다.");
+        }
+
+        ReservationStatus currentStatus = reservation.getReserveStatus();
+        if (currentStatus.getKey() > 30) {                // 40
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 취소되었거나 완료된 예약으로, 추가 작업을 진행할 수 없습니다. 현재 상태: " + currentStatus.getDescription());
+        }
+    }
+
+    private void updateReservationStatusAndApplyPenalty(ReservationEntity reservation, ReservationStatus newStatus, boolean applyPenalty) {
+        // 예약 상태 변경
+        reservation.updateStauts(newStatus);
+        reservationRepository.save(reservation);
+
+        log.info("Reservation reserveNo: {} status updated to: {}", reservation.getReserveNo(), newStatus);
+
+        if (applyPenalty) {
+            Integer userNo = reservation.getUserNo(); // ReservationEntity에 getUsrNo()가 있다고 가정
+            if (userNo == null) {
+                log.warn("Cannot apply penalty for reserveNo: {} because usrNo is null.", reservation.getReserveNo());
+                return;
+            }
+
+            int penaltyCount = (newStatus == ReservationStatus.NO_SHOW_AFTER_APPROVAL) ? 3 : 1;
+
+            LocalDateTime penaltyStartAt = LocalDateTime.now();
+            LocalDateTime penaltyEndAt = LocalDateTime.now().plusDays(29).withHour(23).withMinute(59).withSecond(59);
+
+            log.info("Penalty (count: {}) would be saved for usrNo: {}, reserveNo: {}. (savePenalty method needs implementation in ReservationRepository)",
+                    penaltyCount, userNo, reservation.getReserveNo());
+
+            penaltyCountRepository.save(
+                    PenaltyCountEntity.builder()
+                            .totalPenalty(penaltyCount)
+                            .startAt(penaltyStartAt)
+                            .endAt(penaltyEndAt)
+                            .userNo(userNo)
+                            .build());
+        }
+    }
+
+    private void deleteSingleBookingSchedule(BookingDeleteRequest command) {
+        int deletedCount = bookingRepository.deleteByBookingNoAndShopNo(command.bookingNo(), command.shopNo());
+        if (deletedCount < 1) {
+            log.warn("Booking schedule deletion failed for bookingNo: {} and shopNo: {}. No rows affected.",
+                    command.bookingNo(), command.shopNo());
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 방 예약(스케줄) 정보를 찾을 수 없거나 매장 정보가 일치하지 않습니다: bookingNo=" + command.bookingNo());
+        }
+        log.info("Booking schedule deleted for bookingNo: {}", command.bookingNo());
     }
 
     private void approveReservation(Long reservationNo) {
@@ -233,6 +321,5 @@ public class BookingService {
                 .updatedAt(LocalDateTime.now())
                 .build();
     }
-
 
 }

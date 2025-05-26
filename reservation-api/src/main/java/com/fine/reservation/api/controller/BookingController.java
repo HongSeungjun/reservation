@@ -1,5 +1,6 @@
 package com.fine.reservation.api.controller;
 
+import com.fine.reservation.api.dto.BookingDeleteRequest;
 import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.BookingResponse;
 import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
@@ -39,6 +40,14 @@ public class BookingController {
         bookingService.updateReservationTime(
                 bookingNo, req);
         return ResponseEntity.accepted().build();
+    }
+
+    @DeleteMapping("/{bookingNo}")
+    ResponseEntity delete(@PathVariable Long bookingNo, @Valid @RequestBody BookingDeleteRequest request) {
+
+        bookingService.deleteBooking(bookingNo, request);
+
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping
