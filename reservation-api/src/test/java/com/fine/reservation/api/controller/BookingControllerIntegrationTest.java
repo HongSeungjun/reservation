@@ -2,6 +2,7 @@ package com.fine.reservation.api.controller;
 
 import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.BookingResponse;
+import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
 import com.fine.reservation.api.service.notification.NotificationService;
 import com.fine.reservation.api.service.notification.PushNotificationService;
 import com.fine.reservation.api.service.notification.RedisCacheService;
@@ -15,6 +16,7 @@ import com.fine.reservation.domain.reservation.entity.ReservationEntity;
 import com.fine.reservation.domain.reservation.repository.ReservationRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -32,6 +34,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -308,7 +312,8 @@ class BookingControllerIntegrationTest {
                 "/bookings/" + bookingNoToUpdate,
                 HttpMethod.PUT,
                 entity,
-                new ParameterizedTypeReference<List<Long>>() {}
+                new ParameterizedTypeReference<List<Long>>() {
+                }
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -344,7 +349,8 @@ class BookingControllerIntegrationTest {
                 "/bookings/" + originalBookingNo,
                 HttpMethod.PUT,
                 entity,
-                new ParameterizedTypeReference<List<Long>>() {}
+                new ParameterizedTypeReference<List<Long>>() {
+                }
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -386,7 +392,8 @@ class BookingControllerIntegrationTest {
                 "/bookings/" + bookingNoToUpdate,
                 HttpMethod.PUT,
                 entity,
-                new ParameterizedTypeReference<List<Long>>() {}
+                new ParameterizedTypeReference<List<Long>>() {
+                }
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -427,7 +434,8 @@ class BookingControllerIntegrationTest {
                 "/bookings/" + bookingNoForIdentifyingReservation,
                 HttpMethod.PUT,
                 entity,
-                new ParameterizedTypeReference<List<Long>>() {}
+                new ParameterizedTypeReference<List<Long>>() {
+                }
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -500,5 +508,174 @@ class BookingControllerIntegrationTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("PATCH /bookings/{bookingNo} - 예약 시간 및 방 변경 성공 (202 Accepted)")
+    void testUpdateBookingTime_AndTimeAndMachine_Success() {
+        Long bookingNoToUpdate = 301L;
+        Integer shopNo = 101;
+        Integer originalMachineNo = 3;
+
+        BookingEntity originalBooking = bookingRepository.findById(bookingNoToUpdate).orElseThrow();
+
+        BookingUpdateTimeRequest request = new BookingUpdateTimeRequest(
+                originalMachineNo + 10,
+                LocalDateTime.parse("2025-07-01T10:00:00"),
+                LocalDateTime.parse("2025-07-01T11:00:00"),
+                shopNo
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<BookingUpdateTimeRequest> entity = new HttpEntity<>(request, headers);
+
+        // When
+        ResponseEntity<Void> response = restTemplate.exchange(
+                "/bookings/" + bookingNoToUpdate,
+                HttpMethod.PATCH,
+                entity,
+                Void.class
+        );
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED); // 202
+
+        BookingEntity updatedBooking = bookingRepository.findById(bookingNoToUpdate).orElseThrow();
+        assertThat(updatedBooking.getMachineNo()).isEqualTo(request.machineNo());
+        assertThat(updatedBooking.getBookingStartAt()).isEqualTo(request.bookingStartAt());
+        assertThat(updatedBooking.getBookingEndAt()).isEqualTo(request.bookingEndAt());
+        assertThat(updatedBooking.getUpdatedAt()).isAfter(originalBooking.getUpdatedAt()); // updatedAt 갱신 확인
+        assertThat(updatedBooking.getGameDurationMinutes()).isEqualTo(originalBooking.getGameDurationMinutes());
+        assertThat(updatedBooking.getBookerName()).isEqualTo(originalBooking.getBookerName());
+
+        // WebSocketService.broadcastBookingUpdate 호출 검증
+        ArgumentCaptor<BookingEntity> bookingEntityCaptor = ArgumentCaptor.forClass(BookingEntity.class);
+        verify(webSocketService, times(1)).broadcastBookingUpdate(bookingEntityCaptor.capture());
+        BookingEntity broadcastedBooking = bookingEntityCaptor.getValue();
+        assertThat(broadcastedBooking.getBookingNo()).isEqualTo(bookingNoToUpdate);
+        assertThat(broadcastedBooking.getMachineNo()).isEqualTo(request.machineNo());
+        assertThat(broadcastedBooking.getBookingStartAt()).isEqualTo(request.bookingStartAt());
+    }
+
+    @Test
+    @DisplayName("PATCH /bookings/{bookingNo} - 예약 시간만 변경 성공 (방 번호 동일, 202 Accepted)")
+    void testUpdateBookingTime_OnlyTime_Success() {
+        Long bookingNoToUpdate = 301L;
+        BookingEntity originalBooking = bookingRepository.findById(bookingNoToUpdate).orElseThrow();
+        Integer originalMachineNo = originalBooking.getMachineNo();
+
+        BookingUpdateTimeRequest request = new BookingUpdateTimeRequest(
+                originalMachineNo,
+                LocalDateTime.parse("2025-07-02T11:00:00"),
+                LocalDateTime.parse("2025-07-02T12:00:00"),
+                101
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<BookingUpdateTimeRequest> entity = new HttpEntity<>(request, headers);
+
+        // When
+        ResponseEntity<Void> response = restTemplate.exchange(
+                "/bookings/" + bookingNoToUpdate,
+                HttpMethod.PATCH,
+                entity,
+                Void.class
+        );
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+
+        BookingEntity updatedBooking = bookingRepository.findById(bookingNoToUpdate).orElseThrow();
+        assertThat(updatedBooking.getMachineNo()).isEqualTo(originalMachineNo); // 방 번호 동일
+        assertThat(updatedBooking.getBookingStartAt()).isEqualTo(request.bookingStartAt());
+        assertThat(updatedBooking.getBookingEndAt()).isEqualTo(request.bookingEndAt());
+        assertThat(updatedBooking.getUpdatedAt()).isAfter(originalBooking.getUpdatedAt());
+
+        verify(webSocketService, times(1)).broadcastBookingUpdate(any(BookingEntity.class));
+    }
+
+
+    @Test
+    @DisplayName("PATCH /bookings/{bookingNo} - 존재하지 않는 예약번호 (404 Not Found)")
+    void testUpdateBookingTime_Fail_NotFound() {
+        Long nonExistentBookingNo = 9999L;
+        BookingUpdateTimeRequest request = new BookingUpdateTimeRequest(
+                1, LocalDateTime.now().plusDays(1), LocalDateTime.now().plusDays(1).plusHours(1), 101
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<BookingUpdateTimeRequest> entity = new HttpEntity<>(request, headers);
+
+        // When
+        ResponseEntity<String> response = restTemplate.exchange(
+                "/bookings/" + nonExistentBookingNo,
+                HttpMethod.PATCH,
+                entity,
+                String.class
+        );
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        verify(webSocketService, never()).broadcastBookingUpdate(any(BookingEntity.class));
+    }
+
+    @Test
+    @DisplayName("PATCH /bookings/{bookingNo} - 시간 중복 (409 Conflict)")
+    void testUpdateBookingTime_Fail_Conflict() {
+        Long bookingNoToUpdate = 301L;
+        Integer conflictingMachineNo = 4;
+        LocalDateTime conflictingStartTime = LocalDateTime.of(LocalDate.now().plusDays(1), LocalTime.of(14, 0, 0)); // 401번의 시간
+        LocalDateTime conflictingEndTime = LocalDateTime.of(LocalDate.now().plusDays(1), LocalTime.of(15, 0, 0));   // 401번의 시간
+
+        BookingUpdateTimeRequest request = new BookingUpdateTimeRequest(
+                conflictingMachineNo,
+                conflictingStartTime,
+                conflictingEndTime,
+                101
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<BookingUpdateTimeRequest> entity = new HttpEntity<>(request, headers);
+
+        // When
+        ResponseEntity<String> response = restTemplate.exchange(
+                "/bookings/" + bookingNoToUpdate,
+                HttpMethod.PATCH,
+                entity,
+                String.class
+        );
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        verify(webSocketService, never()).broadcastBookingUpdate(any(BookingEntity.class));
+    }
+
+    @Test
+    @DisplayName("PATCH /bookings/{bookingNo} - 잘못된 요청 데이터 (예: 시작시간 누락, 400 Bad Request)")
+    void testUpdateBookingTime_Fail_InvalidRequest() {
+        Long bookingNoToUpdate = 301L;
+        BookingUpdateTimeRequest invalidRequest = new BookingUpdateTimeRequest(
+                1, null, LocalDateTime.now().plusHours(1),101
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<BookingUpdateTimeRequest> entity = new HttpEntity<>(invalidRequest, headers);
+
+        // When
+        ResponseEntity<String> response = restTemplate.exchange(
+                "/bookings/" + bookingNoToUpdate,
+                HttpMethod.PATCH,
+                entity,
+                String.class
+        );
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(webSocketService, never()).broadcastBookingUpdate(any(BookingEntity.class));
     }
 }

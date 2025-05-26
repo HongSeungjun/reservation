@@ -2,6 +2,7 @@ package com.fine.reservation.api.controller;
 
 import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.BookingResponse;
+import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
 import com.fine.reservation.api.mapper.BookingDtoMapper;
 import com.fine.reservation.api.service.BookingService;
 import com.fine.reservation.domain.booking.entity.BookingEntity;
@@ -31,6 +32,13 @@ public class BookingController {
     @PutMapping("/{bookingNo}")
     public ResponseEntity<List<Long>> updateBooking(@PathVariable Long bookingNo, @RequestBody @Valid BookingRequest req) {
         return ResponseEntity.ok(bookingService.updateBookings(bookingNo, req));
+    }
+
+    @PatchMapping("/{bookingNo}")
+    public ResponseEntity updateBookingTime(@PathVariable Long bookingNo, @RequestBody @Valid BookingUpdateTimeRequest req) {
+        bookingService.updateReservationTime(
+                bookingNo, req);
+        return ResponseEntity.accepted().build();
     }
 
     @GetMapping

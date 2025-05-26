@@ -1,6 +1,7 @@
 package com.fine.reservation.api.service;
 
 import com.fine.reservation.api.dto.BookingRequest;
+import com.fine.reservation.api.dto.BookingUpdateTimeRequest;
 import com.fine.reservation.api.mapper.BookingDtoMapper;
 import com.fine.reservation.api.service.notification.NotificationService;
 import com.fine.reservation.api.service.notification.PushNotificationService;
@@ -11,6 +12,7 @@ import com.fine.reservation.domain.booking.repository.BookingRepository;
 import com.fine.reservation.domain.enums.ReservationStatus;
 import com.fine.reservation.domain.reservation.entity.ReservationEntity;
 import com.fine.reservation.domain.reservation.repository.ReservationRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -90,6 +92,29 @@ public class BookingService {
         }
 
         return updatedBookingNos;
+    }
+
+    @Transactional
+    public void updateReservationTime(Long bookingNo, BookingUpdateTimeRequest request) {
+        BookingEntity originalEntity = bookingRepository.findById(bookingNo)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약 정보를 찾을 수 없습니다: " + bookingNo));
+
+        boolean overlap = bookingRepository.existsOverlap(
+                request.machineNo(),
+                request.bookingStartAt(),
+                request.bookingEndAt(),
+                bookingNo
+        );
+
+        if (overlap) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "요청하신 시간에 해당 방(" + request.machineNo() + "번)은 이미 사용 중입니다.");
+        }
+
+        BookingEntity updatedEntity = buildBookingEntityForTimeUpdate(originalEntity, request);
+
+        bookingRepository.save(updatedEntity);
+
+        webSocketService.broadcastBookingUpdate(updatedEntity);
     }
 
     private void approveReservation(Long reservationNo) {
@@ -185,5 +210,29 @@ public class BookingService {
                 .updatedAt(LocalDateTime.now())
                 .build();
     }
+
+    private BookingEntity buildBookingEntityForTimeUpdate(BookingEntity originalEntity, BookingUpdateTimeRequest request) {
+        return BookingEntity.builder()
+                .bookingNo(originalEntity.getBookingNo())
+                .shopNo(originalEntity.getShopNo())
+                .peopleCount(originalEntity.getPeopleCount())
+                .holeCount(originalEntity.getHoleCount())
+                .bookerName(originalEntity.getBookerName())
+                .phoneNumber(originalEntity.getPhoneNumber())
+                .bookingMemo(originalEntity.getBookingMemo())
+                .bookingChannel(originalEntity.getBookingChannel())
+                .gameMode(originalEntity.getGameMode())
+                .gameDurationMinutes(originalEntity.getGameDurationMinutes())
+                .reserveNo(originalEntity.getReserveNo())
+                .createdAt(originalEntity.getCreatedAt())
+
+                .machineNo(request.machineNo())
+                .bookingStartAt(request.bookingStartAt())
+                .bookingEndAt(request.bookingEndAt())
+
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
 
 }
