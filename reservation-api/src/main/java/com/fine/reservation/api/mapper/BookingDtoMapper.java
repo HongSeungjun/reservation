@@ -1,9 +1,9 @@
 package com.fine.reservation.api.mapper;
 
+import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.BookingResponse;
 import com.fine.reservation.domain.booking.entity.BookingEntity;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import org.mapstruct.*;
 
 import java.util.List;
 
@@ -18,4 +18,10 @@ public interface BookingDtoMapper {
     BookingResponse toResponse(BookingEntity booking);
 
     List<BookingResponse> toResponseList(List<BookingEntity> bookings);
+
+    BookingEntity toEntity(BookingRequest request);
+
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    void updateFromRequest(BookingRequest dto, @MappingTarget BookingEntity entity);
+
 }

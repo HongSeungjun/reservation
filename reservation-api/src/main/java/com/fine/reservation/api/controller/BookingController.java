@@ -1,6 +1,5 @@
 package com.fine.reservation.api.controller;
 
-import com.fine.reservation.api.dto.BookingNoResponse;
 import com.fine.reservation.api.dto.BookingRequest;
 import com.fine.reservation.api.dto.BookingResponse;
 import com.fine.reservation.api.mapper.BookingDtoMapper;
@@ -25,15 +24,17 @@ public class BookingController {
     private final BookingDtoMapper bookingMapper;
 
     @PostMapping
-    public ResponseEntity<BookingNoResponse> book(@RequestBody @Valid BookingRequest req) {
-        List<Long> result = bookingService.createBookings(req);
-        return ResponseEntity.ok(new BookingNoResponse(result));
+    public ResponseEntity<List<Long>> book(@RequestBody @Valid BookingRequest req) {
+        return ResponseEntity.ok(bookingService.createBookings(req));
+    }
+
+    @PutMapping("/{bookingNo}")
+    public ResponseEntity<List<Long>> updateBooking(@PathVariable Long bookingNo, @RequestBody @Valid BookingRequest req) {
+        return ResponseEntity.ok(bookingService.updateBookings(bookingNo, req));
     }
 
     @GetMapping
-    public ResponseEntity<List<BookingResponse>> getBookings(
-            @RequestParam("startAt") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startAt,
-            @RequestParam("endAt") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endAt
+    public ResponseEntity<List<BookingResponse>> getBookings(@RequestParam("startAt") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startAt, @RequestParam("endAt") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endAt
 
     ) {
         if (startAt.isAfter(endAt)) {

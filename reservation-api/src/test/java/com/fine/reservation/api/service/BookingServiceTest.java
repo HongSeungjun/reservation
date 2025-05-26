@@ -6,12 +6,12 @@ import com.fine.reservation.api.service.notification.PushNotificationService;
 import com.fine.reservation.api.service.notification.RedisCacheService;
 import com.fine.reservation.api.service.notification.WebSocketService;
 import com.fine.reservation.domain.booking.entity.BookingEntity;
-import com.fine.reservation.domain.booking.repository.BookingJpaRepository;
+import com.fine.reservation.domain.booking.repository.BookingRepository;
 import com.fine.reservation.domain.enums.BookingChannel;
 import com.fine.reservation.domain.enums.GameMode;
 import com.fine.reservation.domain.enums.ReservationStatus;
 import com.fine.reservation.domain.reservation.entity.ReservationEntity;
-import com.fine.reservation.domain.reservation.repository.ReservationJpaRepository;
+import com.fine.reservation.domain.reservation.repository.ReservationRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,8 +34,8 @@ class BookingServiceTest {
     private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    @Mock private BookingJpaRepository   bookingRepository;
-    @Mock private ReservationJpaRepository reservationRepository;
+    @Mock private BookingRepository bookingRepository;
+    @Mock private ReservationRepository reservationRepository;
     @Mock private NotificationService    notificationService;
     @Mock private PushNotificationService pushService;
     @Mock private WebSocketService        webSocketService;
@@ -44,16 +44,14 @@ class BookingServiceTest {
 
     @Test
     @DisplayName("예약번호가 있는 경우 Reservation 상태를 업데이트하고 Booking을 생성한다")
-    void createBookings_WithReservationNo_ShouldUpdateReservationStatusAndCreateBookings() {
+    void createBookings_WithReservationNo_ShouldApproveReservationAndCreateBookings() {
         // Given
         LocalDateTime now   = LocalDateTime.now();
-        String start        = now.plusHours(1).format(FORMATTER);
-        String end          = now.plusHours(2).format(FORMATTER);
 
         BookingRequest request = new BookingRequest(
                 List.of(1, 2),
-                start,
-                end,
+                now.plusHours(1),
+                now.plusHours(2),
                 4,
                 18,
                 "홍길동",
@@ -107,13 +105,11 @@ class BookingServiceTest {
     void createBookings_WithoutReservationNo_ShouldOnlyCreateBookings() {
         // Given
         LocalDateTime now   = LocalDateTime.now();
-        String start        = now.plusHours(1).format(FORMATTER);
-        String end          = now.plusHours(2).format(FORMATTER);
 
         BookingRequest request = new BookingRequest(
                 List.of(3),
-                start,
-                end,
+                now.plusHours(1),
+                now.plusHours(2),
                 2,
                 9,
                 "김철수",
@@ -154,13 +150,11 @@ class BookingServiceTest {
     void createBookings_WithInvalidReservationStatus_ShouldThrowException() {
         // Given
         LocalDateTime now   = LocalDateTime.now();
-        String start        = now.plusHours(1).format(FORMATTER);
-        String end          = now.plusHours(2).format(FORMATTER);
 
         BookingRequest request = new BookingRequest(
                 List.of(1),
-                start,
-                end,
+                now.plusHours(1),
+                now.plusHours(2),
                 2,
                 9,
                 "박지성",
@@ -190,13 +184,11 @@ class BookingServiceTest {
     void createBookings_WithNonExistentReservationNo_ShouldThrowException() {
         // Given
         LocalDateTime now   = LocalDateTime.now();
-        String start        = now.plusHours(1).format(FORMATTER);
-        String end          = now.plusHours(2).format(FORMATTER);
 
         BookingRequest request = new BookingRequest(
                 List.of(1),
-                start,
-                end,
+                now.plusHours(1),
+                now.plusHours(2),
                 2,
                 9,
                 "이순신",
